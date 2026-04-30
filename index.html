@@ -65,7 +65,7 @@
         return count >= 3;
     }
 
-    function onResults(res) {
+function onResults(res) {
         cElement.width = vElement.videoWidth;
         cElement.height = vElement.videoHeight;
         ctx.save();
@@ -80,10 +80,12 @@
         if (res.multiHandLandmarks && res.multiHandedness) {
             res.multiHandLandmarks.forEach((pts, i) => {
                 const label = res.multiHandedness[i].label;
-                const isR = label === 'Right';
-                const idx = isR ? 1 : 0;
+                
+                // MediaPipe 'Right' label ko right hand ke liye use karta hai
+                const isRightHand = label === 'Right';
+                const idx = isRightHand ? 1 : 0; 
 
-                // --- BRIGHT BLUE SKELETON ---
+                // Skeleton drawing
                 ctx.save();
                 ctx.shadowBlur = 10;
                 ctx.shadowColor = '#00fbff';
@@ -96,7 +98,8 @@
                 pwr[idx] = Math.max(0, Math.min(1, pwr[idx]));
 
                 if (open && !wasOpen[idx]) {
-                    const vid = isR ? s : n;
+                    // Right hand par Naruto aur Left hand par Sasuke set kiya gaya hai
+                    const vid = isRightHand ? n : s; 
                     vid.currentTime = 0;
                     vid.play();
                 }
@@ -106,28 +109,30 @@
                 const knk = pts[9];
 
                 if (pwr[idx] > 0.01) {
-                    if (isR) { 
+                    if (isRightHand) { 
                         fR = true;
                         const tx = (wrist.x + knk.x) / 2;
                         const ty = (wrist.y + knk.y) / 2;
-                        s.style.left = `${(1 - tx) * window.innerWidth}px`;
-                        s.style.top = `${ty * window.innerHeight}px`;
-                        s.style.display = 'block';
-                        s.style.opacity = pwr[idx]; 
+                        n.style.left = `${(1 - tx) * window.innerWidth}px`;
+                        n.style.top = `${ty * window.innerHeight}px`;
+                        n.style.display = 'block';
+                        n.style.opacity = pwr[idx]; 
                     } else { 
                         fL = true;
                         const dx = knk.x - wrist.x;
                         const dy = knk.y - wrist.y;
                         const tx = knk.x + (dx * 0.8);
                         const ty = knk.y + (dy * 0.8);
-                        n.style.left = `${(1 - tx) * window.innerWidth}px`;
-                        n.style.top = `${(ty * window.innerHeight) - 120}px`;
-                        n.style.display = 'block';
-                        n.style.opacity = pwr[idx]; 
+                        s.style.left = `${(1 - tx) * window.innerWidth}px`;
+                        s.style.top = `${(ty * window.innerHeight) - 120}px`;
+                        s.style.display = 'block';
+                        s.style.opacity = pwr[idx]; 
                     }
                 }
             });
         }
+        // ... rest of your power-down logic
+    }
 
         if (!fL) {
             pwr[0] = Math.max(0, pwr[0] - 0.15);
