@@ -2,127 +2,107 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Naruto Hand Effects</title>
+<title>Hand Effect</title>
 
 <style>
-body {
-  margin:0;
-  overflow:hidden;
-  background:black;
-}
+body { margin:0; overflow:hidden; background:black; }
 
-/* Camera video */
-#inputVideo {
+video {
   position:absolute;
   width:100%;
   height:100%;
   object-fit:cover;
-  transform: scaleX(-1); /* mirror */
+  transform: scaleX(-1);
 }
 
-/* Effects */
 .fx {
   position:absolute;
   width:200px;
   height:200px;
   display:none;
   transform:translate(-50%,-50%);
-  pointer-events:none;
-}
-
-.fx.show {
-  display:block;
 }
 </style>
 </head>
 
 <body>
 
-<!-- Camera -->
-<video id="inputVideo" autoplay playsinline></video>
+<video id="video" autoplay playsinline></video>
 
-<!-- Effects -->
 <video id="narutoFx" src="naruto.mp4" autoplay loop muted class="fx"></video>
 <video id="sasukeFx" src="sasuke.mp4" autoplay loop muted class="fx"></video>
 
-<!-- Mediapipe -->
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 
 <script>
-const videoElement = document.getElementById("inputVideo");
+const video = document.getElementById("video");
 const narutoFx = document.getElementById("narutoFx");
 const sasukeFx = document.getElementById("sasukeFx");
 
-/* Start Camera */
-async function startCamera() {
-  const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-  videoElement.srcObject = stream;
-}
-startCamera();
+/* START CAMERA */
+navigator.mediaDevices.getUserMedia({ video: true })
+.then(stream => {
+  video.srcObject = stream;
+})
+.catch(err => {
+  alert("Camera error: " + err);
+});
 
-/* Hand detection setup */
+/* MEDIAPIPE */
 const hands = new Hands({
-  locateFile: (file) => {
-    return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
-  }
+  locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
 });
 
 hands.setOptions({
   maxNumHands: 2,
-  modelComplexity: 1,
   minDetectionConfidence: 0.7,
   minTrackingConfidence: 0.7
 });
 
-/* Detect open hand */
-function isHandOpen(l) {
-  return (
-    l[8].y < l[6].y &&
-    l[12].y < l[10].y &&
-    l[16].y < l[14].y &&
-    l[20].y < l[18].y
-  );
+/* HAND OPEN CHECK */
+function isOpen(l) {
+  return l[8].y < l[6].y &&
+         l[12].y < l[10].y &&
+         l[16].y < l[14].y &&
+         l[20].y < l[18].y;
 }
 
-/* Main logic */
-hands.onResults((results) => {
-  narutoFx.classList.remove("show");
-  sasukeFx.classList.remove("show");
+/* MAIN LOGIC */
+hands.onResults(res => {
+  narutoFx.style.display = "none";
+  sasukeFx.style.display = "none";
 
-  if (results.multiHandLandmarks) {
-    results.multiHandLandmarks.forEach((l, i) => {
-      const type = results.multiHandedness[i].label;
-      const open = isHandOpen(l);
+  if (!res.multiHandLandmarks) return;
 
-      const x = (1 - l[9].x) * window.innerWidth;
-      const y = l[9].y * window.innerHeight;
+  res.multiHandLandmarks.forEach((l, i) => {
+    const type = res.multiHandedness[i].label;
 
-      if (open) {
-        if (type === "Right") {
-          narutoFx.style.left = x + "px";
-          narutoFx.style.top = y + "px";
-          narutoFx.classList.add("show");
-        } else {
-          sasukeFx.style.left = x + "px";
-          sasukeFx.style.top = y + "px";
-          sasukeFx.classList.add("show");
-        }
+    const x = (1 - l[9].x) * window.innerWidth;
+    const y = l[9].y * window.innerHeight;
+
+    if (isOpen(l)) {
+      if (type === "Right") {
+        narutoFx.style.display = "block";
+        narutoFx.style.left = x + "px";
+        narutoFx.style.top = y + "px";
+      } else {
+        sasukeFx.style.display = "block";
+        sasukeFx.style.left = x + "px";
+        sasukeFx.style.top = y + "px";
       }
-    });
-  }
+    }
+  });
 });
 
-/* Camera to Mediapipe */
-const camera = new Camera(videoElement, {
-  onFrame: async () => {
-    await hands.send({ image: videoElement });
-  },
-  width: 640,
-  height: 480
-});
+/* LOOP SEND FRAMES */
+async function detect() {
+  await hands.send({ image: video });
+  requestAnimationFrame(detect);
+}
 
-camera.start();
+video.onloadeddata = () => {
+  detect();
+};
 </script>
 
 </body>
