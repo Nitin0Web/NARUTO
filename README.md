@@ -1,4 +1,4 @@
-[README.md](https://github.com/user-attachments/files/27253623/README.md)
+(https://github.com/user-attachments/files/27253623/README.md)
 # NARUTO
 
 Simple hand tracking with Naruto/Sasuke powers.
