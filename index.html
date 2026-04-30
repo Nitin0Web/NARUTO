@@ -3,44 +3,52 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>naruto</title>
+  <title>Naruto vs Sasuke Hand Power</title>
   
+  <!-- MediaPipe Libraries -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
 
   <style>
-    body { margin: 0; overflow: hidden; background-color: black; }
-    #v_src, #out {
-      position: absolute; top: 0; left: 0;
-      width: 100vw; height: 100vh;
-      object-fit: cover; transform: scaleX(-1);
+    body { margin: 0; overflow: hidden; background-color: black; font-family: sans-serif; }
+    
+    /* Camera Setup */
+    #v_src {
+      position: absolute; width: 100vw; height: 100vh;
+      object-fit: cover; transform: scaleX(-1); z-index: 1;
     }
-    #out { z-index: 2; pointer-events: none; }
-    .darkness {
-      position: absolute; top: 0; left: 0;
-      width: 100vw; height: 100vh;
-      background: rgba(10, 5, 0, 0.3);
-      mix-blend-mode: multiply; pointer-events: none; z-index: 5;
+    #out {
+      position: absolute; width: 100vw; height: 100vh;
+      object-fit: cover; transform: scaleX(-1); z-index: 2;
+      pointer-events: none;
     }
+
+    /* Video Effects */
     .fx {
-      position: absolute; height: auto; top: 0; left: 0;
-      transform: translate(-50%, -50%);
-      pointer-events: none; display: none;
-      mix-blend-mode: screen; z-index: 20;
+      position: absolute; pointer-events: none; display: none;
+      mix-blend-mode: screen; z-index: 20; transform: translate(-50%, -50%);
     }
-    #n { width: 1600px; }
-    #s { width: 2400px; }
+    #n { width: 400px; } /* Naruto Rasengan size */
+    #s { width: 500px; } /* Sasuke Chidori size */
+
+    /* Error Message */
+    #error-msg {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      color: white; z-index: 100; text-align: center; display: none;
+    }
   </style>
 </head>
 <body>
 
+  <div id="error-msg">Camera access nahi mil raha hai. Kripya permission allow karein.</div>
+  
   <video id="v_src" autoplay playsinline></video>
   <canvas id="out"></canvas>
-  <div class="darkness"></div>
 
-  <video id="n" class="fx" src="assets/naruto.mp4" muted autoplay loop playsinline></video>
-  <video id="s" class="fx" src="assets/sasuke.mp4" muted autoplay loop playsinline></video>
+  <!-- Effects Videos (Make sure paths are correct) -->
+  <video id="n" class="fx" src="naruto.mp4" muted loop playsinline></video>
+  <video id="s" class="fx" src="sasuke.mp4" muted loop playsinline></video>
 
   <script>
     const vElement = document.getElementById('v_src');
@@ -48,8 +56,9 @@
     const ctx = cElement.getContext('2d');
     const n = document.getElementById('n');
     const s = document.getElementById('s');
+    const errorMsg = document.getElementById('error-msg');
 
-    let pwr = [0, 0]; 
+    let pwr = [0, 0]; // [Left, Right]
     let wasOpen = [false, false];
 
     function checkOpen(pts) {
@@ -58,96 +67,55 @@
         const tips = [8, 12, 16, 20];
         const pips = [6, 10, 14, 18];
         for (let i = 0; i < tips.length; i++) {
-            const tip = pts[tips[i]];
-            const pip = pts[pips[i]];
-            if (Math.hypot(tip.x - wrist.x, tip.y - wrist.y) > Math.hypot(pip.x - wrist.x, pip.y - wrist.y)) count++;
+            if (Math.hypot(pts[tips[i]].x - wrist.x, pts[tips[i]].y - wrist.y) > 
+                Math.hypot(pts[pips[i]].x - wrist.x, pts[pips[i]].y - wrist.y)) count++;
         }
         return count >= 3;
     }
 
     function onResults(res) {
+        // Canvas size update
         cElement.width = vElement.videoWidth;
         cElement.height = vElement.videoHeight;
+        
         ctx.save();
         ctx.clearRect(0, 0, cElement.width, cElement.height);
 
-        let fL = false;
-        let fR = false;
-
-        // Reset display to hidden each frame
         n.style.display = 'none';
         s.style.display = 'none';
 
         if (res.multiHandLandmarks && res.multiHandedness) {
             res.multiHandLandmarks.forEach((pts, i) => {
-                const label = res.multiHandedness[i].label; // 'Left' or 'Right'
-                
-                /* 
-                   IMPORTANT: MediaPipe output 'Right' label is for the actual Right Hand.
-                   Since we mirror the video (scaleX -1), the logic below keeps the 
-                   video tracking the correct physical hand.
-                */
+                const label = res.multiHandedness[i].label; // "Left" or "Right"
                 const isRightHand = label === 'Right';
-                const idx = isRightHand ? 1 : 0; 
+                const idx = isRightHand ? 1 : 0;
 
-                // Draw Blue Glow Skeleton
-                ctx.save();
-                ctx.shadowBlur = 15;
-                ctx.shadowColor = '#00fbff';
-                drawConnectors(ctx, pts, HAND_CONNECTIONS, {color: '#00d4ff', lineWidth: 4});
+                // Skeleton Drawing
+                drawConnectors(ctx, pts, HAND_CONNECTIONS, {color: '#00fbff', lineWidth: 3});
                 drawLandmarks(ctx, pts, {color: '#ffffff', lineWidth: 1, radius: 2});
-                ctx.restore();
 
                 const open = checkOpen(pts);
-                
-                // Smooth power up/down
-                pwr[idx] += open ? 0.1 : -0.2; 
+                pwr[idx] += open ? 0.1 : -0.2;
                 pwr[idx] = Math.max(0, Math.min(1, pwr[idx]));
 
                 if (open && !wasOpen[idx]) {
-                    const vid = isRightHand ? n : s; 
+                    const vid = isRightHand ? n : s;
                     vid.currentTime = 0;
-                    vid.play();
+                    vid.play().catch(() => {});
                 }
                 wasOpen[idx] = open;
 
-                const wrist = pts[0];
-                const middleKnuckle = pts[9];
-
-                if (pwr[idx] > 0.05) {
-                    const tx = (wrist.x + middleKnuckle.x) / 2;
-                    const ty = (wrist.y + middleKnuckle.y) / 2;
-
-                    if (isRightHand) { 
-                        fR = true;
-                        // Naruto on Right Hand
-                        n.style.left = `${(1 - tx) * window.innerWidth}px`;
-                        n.style.top = `${ty * window.innerHeight}px`;
-                        n.style.display = 'block';
-                        n.style.opacity = pwr[idx]; 
-                    } else { 
-                        fL = true;
-                        // Sasuke on Left Hand
-                        s.style.left = `${(1 - tx) * window.innerWidth}px`;
-                        s.style.top = `${ty * window.innerHeight}px`;
-                        s.style.display = 'block';
-                        s.style.opacity = pwr[idx]; 
-                    }
+                if (pwr[idx] > 0.1) {
+                    const x = pts[9].x * window.innerWidth;
+                    const y = pts[9].y * window.innerHeight;
+                    const targetVid = isRightHand ? n : s;
+                    
+                    targetVid.style.display = 'block';
+                    targetVid.style.left = `${x}px`;
+                    targetVid.style.top = `${y}px`;
+                    targetVid.style.opacity = pwr[idx];
                 }
             });
-        }
-        // ... power persistence logic
-    }
-
-        if (!fL) {
-            pwr[0] = Math.max(0, pwr[0] - 0.15);
-            if (pwr[0] > 0.01) { n.style.display = 'block'; n.style.opacity = pwr[0]; }
-            wasOpen[0] = false;
-        }
-        if (!fR) {
-            pwr[1] = Math.max(0, pwr[1] - 0.15);
-            if (pwr[1] > 0.01) { s.style.display = 'block'; s.style.opacity = pwr[1]; }
-            wasOpen[1] = false;
         }
         ctx.restore();
     }
@@ -159,8 +127,8 @@
     h.setOptions({
         maxNumHands: 2,
         modelComplexity: 1,
-        minDetectionConfidence: 0.65,
-        minTrackingConfidence: 0.65
+        minDetectionConfidence: 0.7,
+        minTrackingConfidence: 0.7
     });
 
     h.onResults(onResults);
@@ -169,7 +137,11 @@
         onFrame: async () => { await h.send({ image: vElement }); },
         width: 1280, height: 720
     });
-    cam.start();
+
+    cam.start().catch(err => {
+        console.error(err);
+        errorMsg.style.display = 'block';
+    });
   </script>
 </body>
 </html>
